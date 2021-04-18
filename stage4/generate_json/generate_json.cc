@@ -255,6 +255,124 @@ print_datatype_c *print_datatype_c::print_datatype = NULL;
 
 
 
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+
+
+class print_calls_c: public iterator_visitor_c {
+  private:
+    stage4out_c &s4o;
+    int count;  // number of POU calls already printed
+
+  public:
+    print_calls_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {count = 0;}
+    ~print_calls_c(void) {}
+    
+   int get_count(void) {return count;}    
+
+
+  private:
+
+    
+void *print_token(symbol_c *token) {
+  if (count != 0)
+    s4o.print(",\n");
+    
+  s4o.print(s4o.indent_spaces + "\"");
+  s4o.print(token->token->value);
+  s4o.print("\"");
+  count++;
+
+  return NULL;
+}
+
+
+/****************************************/
+/* B.2 - Language IL (Instruction List) */
+/****************************************/
+
+/***********************************/
+/* B 2.1 Instructions and Operands */
+/***********************************/
+/* | function_name [il_operand_list] */
+void *visit(il_function_call_c *symbol) {
+  print_token(symbol->function_name);
+  // recursively visit all ther symbols in the AST
+  if (symbol->il_operand_list != NULL)
+    symbol->il_operand_list->accept(*this);
+  return NULL;
+}
+
+
+/*   il_call_operator prev_declared_fb_name
+ * | il_call_operator prev_declared_fb_name '(' ')'
+ * | il_call_operator prev_declared_fb_name '(' eol_list ')'
+ * | il_call_operator prev_declared_fb_name '(' il_operand_list ')'
+ * | il_call_operator prev_declared_fb_name '(' eol_list il_param_list ')'
+ */
+void *visit(il_fb_call_c *symbol) {
+  print_token(symbol->fb_name);
+  // recursively visit all ther symbols in the AST
+  symbol->il_call_operator->accept(*this);
+  if (symbol->il_operand_list != NULL)  symbol->il_operand_list->accept(*this);
+  if (symbol->il_param_list   != NULL)  symbol->il_param_list  ->accept(*this);
+  return NULL;
+}
+
+
+/* | function_name '(' eol_list [il_param_list] ')' */
+void *visit(il_formal_funct_call_c *symbol) {
+  print_token(symbol->function_name);
+  // recursively visit all ther symbols in the AST
+  if (symbol->il_param_list != NULL)   symbol->il_param_list->accept(*this);
+  return NULL;
+}
+
+
+
+/***************************************/
+/* B.3 - Language ST (Structured Text) */
+/***************************************/
+/***********************/
+/* B 3.1 - Expressions */
+/***********************/
+void *visit(function_invocation_c *symbol) {
+  print_token(symbol->function_name);
+  // recursively visit all ther symbols in the AST
+  /* If the syntax parser is working correctly, exactly one of the 
+   * following two symbols will be NULL, while the other is != NULL.
+   */
+  if (symbol->   formal_param_list != NULL) symbol->   formal_param_list->accept(*this);
+  if (symbol->nonformal_param_list != NULL) symbol->nonformal_param_list->accept(*this);
+  return NULL;
+}
+
+
+/*****************************************/
+/* B 3.2.2 Subprogram Control Statements */
+/*****************************************/
+
+/* fb_name '(' [param_assignment_list] ')' */
+void *visit(fb_invocation_c *symbol) {
+  print_token(symbol->fb_name);
+  // recursively visit all ther symbols in the AST
+  /* If the syntax parser is working correctly, at most one of the 
+   * following two symbols will be NULL, while the other is != NULL.
+   * The two may be NULL simultaneously!
+   */
+  if (symbol->   formal_param_list != NULL) symbol->   formal_param_list->accept(*this);
+  if (symbol->nonformal_param_list != NULL) symbol->nonformal_param_list->accept(*this);
+  return NULL;
+}
+
+
+}; // class print_calls_c
+
+
+
+
 
 
 /***********************************************************************/
@@ -307,10 +425,25 @@ void *print_inputargs(symbol_c *pou_decl) {
     count++;
   }
   if (count != 0)
-    s4o.print(",\n");
+    s4o.print("\n");
   return NULL;
 }
 
+
+
+
+
+
+
+void *print_calls(symbol_c *pou_decl) {
+  print_calls_c print_calls(&s4o);
+  
+  pou_decl->accept(print_calls);
+  if (print_calls.get_count() > 0)
+    s4o.print("\n");
+  
+  return NULL;
+}
 
     
 void *print_operation(symbol_c *name,
@@ -340,8 +473,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"args\": [\n");
       s4o.indent_right();
-      //args->accept(*(print_inputargs_c::get_singleton()));
-      print_inputargs(name->parent);
+      print_inputargs(name->parent);   // name->parent will be the POU declaration
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
 
@@ -368,7 +500,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"calls\": [\n");
       s4o.indent_right();
-      // visit...
+      print_calls(name->parent);  // name->parent will be the POU declaration
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
       
