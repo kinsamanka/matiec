@@ -374,6 +374,137 @@ void *visit(fb_invocation_c *symbol) {
 
 
 
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+
+
+
+
+
+
+// concatenate the name of a structured variable into a single string...
+class get_multielementvar_name_c: public null_visitor_c {
+  private:
+    std::string name;
+  
+  public:
+    get_multielementvar_name_c(void) {}
+    ~get_multielementvar_name_c(void) {}
+    
+   std::string get_name(symbol_c *symbol) {
+     name.clear();
+     symbol->accept(*this);
+     return name;
+  }    
+
+  
+/*********************/
+/* B 1.4 - Variables */
+/*********************/
+void *visit(symbolic_variable_c *symbol) {name += symbol->token->value; return NULL;}
+
+
+/*************************************/
+/* B.1.4.2   Multi-element Variables */
+/*************************************/
+/*  record_variable '.' field_selector */
+void *visit(structured_variable_c *symbol) {
+  symbol->record_variable->accept(*this);
+  name += ".";
+  name += symbol->field_selector->token->value;
+  return NULL;
+}
+
+}; // class get_multielementvar_name_c
+
+
+
+
+
+
+class print_uses_c: public iterator_visitor_c {
+  private:
+    stage4out_c &s4o;
+    int count;  // number of POU calls already printed
+
+  public:
+    print_uses_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {count = 0;}
+    ~print_uses_c(void) {}
+    
+   int get_count(void) {return count;}    
+
+
+  private:
+
+    
+void *print_token(const char *varname) {
+  if (count != 0)
+    s4o.print(",\n");
+    
+  s4o.print(s4o.indent_spaces + "\"");
+  s4o.print(varname);
+  s4o.print("\"");
+  count++;
+
+  return NULL;
+}
+
+
+/*********************/
+/* B 1.4 - Variables */
+/*********************/
+void *visit(symbolic_variable_c *symbol) {return print_token(symbol->var_name->token->value);}
+void *visit(symbolic_constant_c *symbol) {return print_token(symbol->var_name->token->value);}
+
+/********************************************/
+/* B.1.4.1   Directly Represented Variables */
+/********************************************/
+void *visit(direct_variable_c *symbol) {return print_token(symbol->token->value);}
+
+
+/*************************************/
+/* B.1.4.2   Multi-element Variables */
+/*************************************/
+/*  subscripted_variable '[' subscript_list ']' */
+void *visit(array_variable_c *symbol) {
+  // TODO: How to handle array variables??
+  /*
+  symbol->subscripted_variable->accept(*this);
+  s4o.print("[");
+  symbol->subscript_list->accept(*this);
+  s4o.print("]");
+  */
+  // TODO: a subscripted_variable may be a structured_variable_c, 
+  //       in which case symbol->subscripted_variable->token will NULL,
+  //       resulting in a segmentation fault!
+  print_token(symbol->subscripted_variable->token->value);
+  // recursively visit the subscript_list as it may contain more variable accesses
+  symbol->subscript_list->accept(*this);
+  return NULL;
+}
+
+
+/*  record_variable '.' field_selector */
+void *visit(structured_variable_c *symbol) {
+  // DO NOT descend down the rabbit hole!
+  // the first time this visitor gets called (i.e. the top most variable)
+  // we do NOT recursvly call the record variable.
+  get_multielementvar_name_c get_multielementvar_name;
+  print_token(get_multielementvar_name.get_name(symbol).c_str());
+  return NULL;
+}
+
+
+
+
+
+}; // class print_uses_c
+
+
+
+
 
 /***********************************************************************/
 /***********************************************************************/
@@ -431,10 +562,6 @@ void *print_inputargs(symbol_c *pou_decl) {
 
 
 
-
-
-
-
 void *print_calls(symbol_c *pou_decl) {
   print_calls_c print_calls(&s4o);
   
@@ -445,10 +572,21 @@ void *print_calls(symbol_c *pou_decl) {
   return NULL;
 }
 
-    
+
+
+void *print_uses(symbol_c *pou_body) {
+  print_uses_c print_uses(&s4o);
+  pou_body->accept(print_uses);
+  s4o.print("\n");
+  return NULL;
+}
+
+
+
 void *print_operation(symbol_c *name,
                       symbol_c *returns,
-                      symbol_c *args
+                      symbol_c *args,
+                      symbol_c *pou_body
                      ) {
   s4o.print(s4o.indent_spaces + "{\n");
   s4o.indent_right();
@@ -509,7 +647,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"uses\": [\n");
       s4o.indent_right();
-      // visit...
+      print_uses(pou_body);  // name->parent will be the POU declaration
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
       
@@ -548,17 +686,18 @@ void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); r
 /***********************/
 /* B 1.5.1 - Functions */
 /***********************/
+/*  FUNCTION derived_function_name ':' elementary_type_name io_OR_function_var_declarations_list function_body END_FUNCTION */
 void *visit(function_declaration_c *symbol) {
-  return print_operation(symbol->derived_function_name, symbol->type_name, symbol->var_declarations_list);
+  return print_operation(symbol->derived_function_name, symbol->type_name, symbol->var_declarations_list, symbol->function_body);
 }
 
 
 /*****************************/
 /* B 1.5.2 - Function Blocks */
 /*****************************/
-/*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations function_block_body END_FUNCTION_BLOCK */
+/*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations fblock_body END_FUNCTION_BLOCK */
 void *visit(function_block_declaration_c *symbol) {
-  return print_operation(symbol->fblock_name, NULL, symbol->var_declarations);
+  return print_operation(symbol->fblock_name, NULL, symbol->var_declarations, symbol->fblock_body);
 }
 
 
@@ -567,7 +706,7 @@ void *visit(function_block_declaration_c *symbol) {
 /**********************/
 /*  PROGRAM program_type_name program_var_declarations_list function_block_body END_PROGRAM */
 void *visit(program_declaration_c *symbol) {
-  return print_operation(symbol->program_type_name, NULL, symbol->var_declarations);
+  return print_operation(symbol->program_type_name, NULL, symbol->var_declarations, symbol->function_block_body);
 }
 
 
