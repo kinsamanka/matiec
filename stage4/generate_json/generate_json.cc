@@ -52,12 +52,16 @@
 #include "../stage4.hh"
 #include "../../main.hh" // required for ERROR() and ERROR_MSG() macros.
 
+#include "../../absyntax_utils/absyntax_utils.hh"
 
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
 
-/***********************************************************************/
-/***********************************************************************/
-/***********************************************************************/
-/***********************************************************************/
+/* Global variables containing user defined options */
+static stage4out_c *_s4o = NULL;
+
 
 /* Parse command line options passed from main.c !! */
 
@@ -76,14 +80,21 @@ void stage4_print_options(void) {
 /***********************************************************************/
 
 
-class print_datatype_c: public null_visitor_c {
+class print_datatype_c: public iterator_visitor_c {
   private:
     stage4out_c &s4o;
+    static print_datatype_c *print_datatype; // singleton
 
 
   public:
     print_datatype_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {}
     ~print_datatype_c(void) {}
+    
+    static print_datatype_c *get_singleton(void) {
+        if (nullptr == print_datatype)
+          print_datatype = new print_datatype_c(_s4o);
+        return print_datatype;
+    }
 
 
   private:
@@ -93,6 +104,12 @@ void *print_token(symbol_c *token) {
   return s4o.print(token->token->value);
 }
 
+/*******************************************/
+/* B 1.1 - Letters, digits and identifiers */
+/*******************************************/
+void *visit(                 identifier_c *symbol) {return print_token(symbol);}
+void *visit(derived_datatype_identifier_c *symbol) {return print_token(symbol);}
+void *visit(         poutype_identifier_c *symbol) {return print_token(symbol);}
 
 
 /**********************/
@@ -228,22 +245,32 @@ void *visit(ref_type_decl_c *symbol) {
 }
 
 
+
+
 }; // class print_datatype_c
 
 
 
+print_datatype_c *print_datatype_c::print_datatype = NULL; 
+
+
+
+
 
 /***********************************************************************/
 /***********************************************************************/
 /***********************************************************************/
 /***********************************************************************/
+
+
+
+
 
 
 class generate_operation_c: public iterator_visitor_c {
 //class generate_operation_c: public visitor_c {
   private:
     stage4out_c       &s4o;
-    print_datatype_c  *dto;
 
     
 void *print_token(symbol_c *token) {
@@ -252,12 +279,44 @@ void *print_token(symbol_c *token) {
 
 
 void *print_datatype(symbol_c *datatype) {
-  return datatype->accept(*dto);
+  return datatype->accept(*(print_datatype_c::get_singleton()));
 }
+
+
+
+void *print_inputargs(symbol_c *pou_decl) {
+  function_param_iterator_c param_iter(pou_decl);
+  int count = 0;
+  
+  while (param_iter.next() != nullptr) {
+    if (param_iter.is_extensible_param     ()) break;
+    if (param_iter.is_en_eno_param_implicit()) continue;
+    
+    function_param_iterator_c::param_direction_t parmdir;
+    parmdir = param_iter.param_direction();
+    if   ((parmdir != function_param_iterator_c::direction_out) 
+       && (parmdir != function_param_iterator_c::direction_inout))
+      continue;
+    
+    if (count != 0)
+      s4o.print(",\n");
+      
+    s4o.print(s4o.indent_spaces + "\"");
+    print_datatype(param_iter.param_type());
+    s4o.print("\"");
+    count++;
+  }
+  if (count != 0)
+    s4o.print(",\n");
+  return NULL;
+}
+
 
     
 void *print_operation(symbol_c *name,
-                      symbol_c *returns) {
+                      symbol_c *returns,
+                      symbol_c *args
+                     ) {
   s4o.print(s4o.indent_spaces + "{\n");
   s4o.indent_right();
 
@@ -281,7 +340,8 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"args\": [\n");
       s4o.indent_right();
-      // visit...
+      //args->accept(*(print_inputargs_c::get_singleton()));
+      print_inputargs(name->parent);
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
 
@@ -341,18 +401,23 @@ void *print_operation(symbol_c *name,
     
     
   public:
-    generate_operation_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {dto = new print_datatype_c(s4o_ptr);}
+    generate_operation_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {}
     ~generate_operation_c(void) {}
 
     
-
-
+/********************/
+/* 2.1.6 - Pragmas  */
+/********************/
+void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); return NULL;}
+void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); return NULL;} 
+    
+    
 
 /***********************/
 /* B 1.5.1 - Functions */
 /***********************/
 void *visit(function_declaration_c *symbol) {
-  return print_operation(symbol->derived_function_name, symbol->type_name);
+  return print_operation(symbol->derived_function_name, symbol->type_name, symbol->var_declarations_list);
 }
 
 
@@ -361,7 +426,7 @@ void *visit(function_declaration_c *symbol) {
 /*****************************/
 /*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations function_block_body END_FUNCTION_BLOCK */
 void *visit(function_block_declaration_c *symbol) {
-  return print_operation(symbol->fblock_name, NULL);
+  return print_operation(symbol->fblock_name, NULL, symbol->var_declarations);
 }
 
 
@@ -370,7 +435,7 @@ void *visit(function_block_declaration_c *symbol) {
 /**********************/
 /*  PROGRAM program_type_name program_var_declarations_list function_block_body END_PROGRAM */
 void *visit(program_declaration_c *symbol) {
-  return print_operation(symbol->program_type_name, NULL);
+  return print_operation(symbol->program_type_name, NULL, symbol->var_declarations);
 }
 
 
@@ -429,7 +494,10 @@ void *visit(library_c *symbol) {
 
 
 
-visitor_c *new_code_generator(stage4out_c *s4o, const char *builddir)  {return new generate_json_c(s4o);}
+visitor_c *new_code_generator(stage4out_c *s4o, const char *builddir)  {
+    _s4o = s4o;
+    return new generate_json_c(s4o);
+}
 void delete_code_generator(visitor_c *code_generator) {delete code_generator;}
 
 
