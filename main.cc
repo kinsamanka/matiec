@@ -129,7 +129,7 @@ static void printusage(const char *cmd) {
   runtime_options.allow_missing_var_in    = false; /* disable: allow definition and invocation of POUs with no input, output and in_out parameters! */
   stage4_print_options();
   printf("\n");
-  printf("%s - Copyright (C) 2003-2014 \n"
+  printf("%s - Copyright (C) 2003-2021 \n"
          "This program comes with ABSOLUTELY NO WARRANTY!\n"
          "This is free software licensed under GPL v3, and you are welcome to redistribute it under the conditions specified by this license.\n", PACKAGE_NAME);
 }
