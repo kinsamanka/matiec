@@ -268,6 +268,9 @@ class print_calls_c: public iterator_visitor_c {
   private:
     stage4out_c &s4o;
     int count;  // number of POU calls already printed
+    /* A symbol table with all previously printed called operations (so we don't print duplicates!)... */
+    typedef symtable_c<symbol_c *> calls_symtable_t;
+    calls_symtable_t calls_symtable;
 
   public:
     print_calls_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {count = 0;}
@@ -280,6 +283,11 @@ class print_calls_c: public iterator_visitor_c {
 
     
 void *print_token(symbol_c *token) {
+  if (calls_symtable.count(token->token->value) != 0)
+    return NULL; // already printed previously
+
+  calls_symtable.insert(token->token->value, token);
+  
   if (count != 0)
     s4o.print(",\n");
     
@@ -449,6 +457,9 @@ class print_uses_c: public iterator_visitor_c {
   private:
     stage4out_c &s4o;
     int count;  // number of POU calls already printed
+    /* A symbol table with all previously printed variables (so we don't print duplicates!)... */
+    typedef symtable_c<symbol_c *> var_symtable_t;
+    var_symtable_t var_symtable;
 
   public:
     print_uses_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {count = 0;}
@@ -460,7 +471,12 @@ class print_uses_c: public iterator_visitor_c {
   private:
 
     
-void *print_token(const char *varname) {
+void *print_token(const char *varname, symbol_c *symbol) {
+  if (var_symtable.count(varname) != 0)
+    return NULL; // already printed previously
+
+  var_symtable.insert(varname, symbol);
+  
   if (count != 0)
     s4o.print(",\n");
     
@@ -476,13 +492,13 @@ void *print_token(const char *varname) {
 /*********************/
 /* B 1.4 - Variables */
 /*********************/
-void *visit(symbolic_variable_c *symbol) {return print_token(symbol->var_name->token->value);}
-void *visit(symbolic_constant_c *symbol) {return print_token(symbol->var_name->token->value);}
+void *visit(symbolic_variable_c *symbol) {return print_token(symbol->var_name->token->value, symbol);}
+void *visit(symbolic_constant_c *symbol) {return print_token(symbol->var_name->token->value, symbol);}
 
 /********************************************/
 /* B.1.4.1   Directly Represented Variables */
 /********************************************/
-void *visit(direct_variable_c *symbol) {return print_token(symbol->token->value);}
+void *visit(direct_variable_c *symbol) {return print_token(symbol->token->value, symbol);}
 
 
 /*************************************/
@@ -501,7 +517,7 @@ void *visit(array_variable_c *symbol) {
   //       in which case symbol->subscripted_variable->token will NULL,
   //       We must therefore call get_multielementvar_name_c
   get_multielementvar_name_c get_multielementvar_name;
-  print_token(get_multielementvar_name.get_name(symbol->subscripted_variable).c_str());
+  print_token(get_multielementvar_name.get_name(symbol->subscripted_variable).c_str(), symbol);
   // recursively visit the subscript_list as it may contain more variable accesses
   // (for example, inside expressions used as an index to an array: 
   //     v1.v2.v3[ 55 + v4].v5
@@ -520,7 +536,7 @@ void *visit(structured_variable_c *symbol) {
   // the first time this visitor gets called (i.e. the top most variable)
   // we do NOT recursvly call the record variable.
   get_multielementvar_name_c get_multielementvar_name;
-  print_token(get_multielementvar_name.get_name(symbol).c_str());
+  print_token(get_multielementvar_name.get_name(symbol).c_str(), symbol);
   return NULL;
 }
 
@@ -529,6 +545,7 @@ void *visit(structured_variable_c *symbol) {
 
 
 }; // class print_uses_c
+
 
 
 
