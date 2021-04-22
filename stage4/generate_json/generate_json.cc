@@ -91,7 +91,7 @@ class print_datatype_c: public iterator_visitor_c {
     ~print_datatype_c(void) {}
     
     static print_datatype_c *get_singleton(void) {
-        if (nullptr == print_datatype)
+        if (NULL == print_datatype)
           print_datatype = new print_datatype_c(_s4o);
         return print_datatype;
     }
@@ -537,7 +537,7 @@ void *print_inputargs(symbol_c *pou_decl) {
   function_param_iterator_c param_iter(pou_decl);
   int count = 0;
   
-  while (param_iter.next() != nullptr) {
+  while (param_iter.next() != NULL) {
     if (param_iter.is_extensible_param     ()) break;
     if (param_iter.is_en_eno_param_implicit()) continue;
     
@@ -600,7 +600,7 @@ void *print_operation(symbol_c *name,
       s4o.print("\",\n");
     
       // "returns": "<datatype>",
-      if (nullptr != returns) {
+      if (NULL != returns) {
         s4o.print(s4o.indent_spaces + "\"returns\": \"");
         print_datatype(returns);
         s4o.print("\",\n");
