@@ -388,6 +388,7 @@ void *visit(fb_invocation_c *symbol) {
 class get_multielementvar_name_c: public null_visitor_c {
   private:
     std::string name;
+    bool array_found;
   
   public:
     get_multielementvar_name_c(void) {}
@@ -395,6 +396,7 @@ class get_multielementvar_name_c: public null_visitor_c {
     
    std::string get_name(symbol_c *symbol) {
      name.clear();
+     array_found = false;
      symbol->accept(*this);
      return name;
   }    
@@ -409,11 +411,27 @@ void *visit(symbolic_variable_c *symbol) {name += symbol->token->value; return N
 /*************************************/
 /* B.1.4.2   Multi-element Variables */
 /*************************************/
+/*  subscripted_variable '[' subscript_list ']' */
+void *visit(array_variable_c *symbol) {
+  // handle situations like 
+  //  FB1.xxx_local[9].FIELDXX[2]
+  //  We will be working top down when , and if we reach the outermost array 
+  //     FB1.xxx_local 
+  //   we have to throw away the ".FIELDXX" that has been stored in the "name" variable up to now
+
+  // top -> down means we first recursively call the sybol, and then do the work.
+  symbol->subscripted_variable->accept(*this);
+  array_found = true;
+  return NULL;
+}
+
 /*  record_variable '.' field_selector */
 void *visit(structured_variable_c *symbol) {
   symbol->record_variable->accept(*this);
-  name += ".";
-  name += symbol->field_selector->token->value;
+  if (!array_found) {
+    name += "."; 
+    name += symbol->field_selector->token->value;
+  }
   return NULL;
 }
 
@@ -478,10 +496,17 @@ void *visit(array_variable_c *symbol) {
   */
   // TODO: a subscripted_variable may be a structured_variable_c, 
   //       in which case symbol->subscripted_variable->token will NULL,
-  //       resulting in a segmentation fault!
-  print_token(symbol->subscripted_variable->token->value);
+  //       We must therefore call get_multielementvar_name_c
+  get_multielementvar_name_c get_multielementvar_name;
+  print_token(get_multielementvar_name.get_name(symbol->subscripted_variable).c_str());
   // recursively visit the subscript_list as it may contain more variable accesses
-  symbol->subscript_list->accept(*this);
+  // (for example, inside expressions used as an index to an array: 
+  //     v1.v2.v3[ 55 + v4].v5
+  //     by visiting subscript_list we will catch v4
+  //  )
+  
+  
+  //symbol->subscript_list->accept(*this);
   return NULL;
 }
 
