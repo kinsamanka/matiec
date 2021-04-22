@@ -41,6 +41,9 @@
 
 
 
+static int entry_count = 0;
+
+
 
 // #include <stdio.h>  /* required for NULL */
 #include <string>
@@ -614,6 +617,9 @@ void *print_operation(symbol_c *name,
                       symbol_c *args,
                       symbol_c *pou_body
                      ) {
+  if (entry_count++ != 0) 
+    s4o.print(",");
+  s4o.print("\n");
   s4o.print(s4o.indent_spaces + "{\n");
   s4o.indent_right();
 
@@ -684,13 +690,13 @@ void *print_operation(symbol_c *name,
       s4o.indent_right();
       // visit...
       s4o.indent_left();    
-      s4o.print(s4o.indent_spaces + "},\n");
+      s4o.print(s4o.indent_spaces + "}\n");
       
     s4o.indent_left();    
     s4o.print(s4o.indent_spaces + "}\n");  // "operation":
 
   s4o.indent_left();    
-  s4o.print(s4o.indent_spaces + "}\n");
+  s4o.print(s4o.indent_spaces + "}");
   
   return NULL;
 }
@@ -740,6 +746,216 @@ void *visit(program_declaration_c *symbol) {
 
 }; /* class generate_operation_c */
 
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+
+
+
+
+
+
+class generate_data_c: public iterator_visitor_c {
+//class generate_operation_c: public visitor_c {
+  private:
+    stage4out_c       &s4o;
+    symbol_c *current_param_type;
+
+    
+void *print_token(symbol_c *token) {
+  return s4o.print(token->token->value);
+}
+
+
+void *print_datatype(symbol_c *datatype) {
+  return datatype->accept(*(print_datatype_c::get_singleton()));
+}
+
+
+
+void *print_data(symbol_c *name,
+                 symbol_c *datatype
+                 ) {
+  if (entry_count++ != 0) 
+    s4o.print(",");
+  s4o.print("\n");
+  s4o.print(s4o.indent_spaces + "{\n");
+  s4o.indent_right();
+
+    s4o.print(s4o.indent_spaces + "\"data\": {\n");
+    s4o.indent_right();
+
+      // "name": "<string>",
+      s4o.print(s4o.indent_spaces + "\"name\": \"");
+      print_token(name);
+      s4o.print("\",\n");
+    
+      // "datatype": "<datatype>",
+      if (NULL != datatype) {
+        s4o.print(s4o.indent_spaces + "\"datatype\": \"");
+        print_datatype(datatype);
+        s4o.print("\",\n");
+      }
+  
+      // "records": [
+      //    {
+      //      "name": "<name>"
+      //      "datatype": "<datatype>",
+      //    }
+      //  ],
+      s4o.print(s4o.indent_spaces + "\"records\": [\n");
+      s4o.print(s4o.indent_spaces + "],\n");
+
+      // "hints": {
+      //    "module": "<module_name>"
+      //    "imports": [
+      //                "<string>"
+      //               ],
+      //  }
+      s4o.print(s4o.indent_spaces + "\"hints\": {\n");
+      s4o.print(s4o.indent_spaces + "}\n");
+      
+    s4o.indent_left();    
+    s4o.print(s4o.indent_spaces + "}\n");  // "data":
+
+  s4o.indent_left();    
+  s4o.print(s4o.indent_spaces + "}");
+  
+  return NULL;
+}
+    
+    
+  public:
+    generate_data_c(stage4out_c *s4o_ptr): s4o(*s4o_ptr) {current_param_type = NULL;}
+    ~generate_data_c(void) {}
+
+    
+    
+    
+    
+    
+    
+/********************/
+/* 2.1.6 - Pragmas  */
+/********************/
+void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); return NULL;}
+void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); return NULL;} 
+    
+    
+
+    
+/******************************************/
+/* B 1.4.3 - Declaration & Initialisation */
+/******************************************/
+/*| VAR_GLOBAL [CONSTANT|RETAIN] global_var_decl_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(global_var_declarations_c *symbol) {
+  return symbol->global_var_decl_list->accept(*this);
+}
+
+/* helper symbol for global_var_declarations */
+/*| global_var_decl_list global_var_decl ';' */
+// void *visit(global_var_decl_list_c *symbol) {}
+//  use inherited iterator implementation
+
+    
+/*| global_var_spec ':' [located_var_spec_init|function_block_type_name] */
+/* type_specification ->may be NULL ! */
+void *visit(global_var_decl_c *symbol) {
+  current_param_type = spec_init_sperator_c::get_spec(symbol->type_specification);  
+  symbol->global_var_spec->accept(*this);
+  current_param_type = NULL;
+  return NULL;
+}
+    
+    
+/*| global_var_name location */
+void *visit(global_var_spec_c *symbol) {
+  print_data(symbol->global_var_name, current_param_type);
+  //symbol->location->accept(*this);
+  return NULL;
+}
+    
+
+/*| global_var_list ',' global_var_name */
+void *visit(global_var_list_c *symbol) {
+  for(int i = 0; i < symbol->n; i++) {
+    print_data(symbol->get_element(i), current_param_type);
+  }
+  return NULL;
+}
+    
+    
+    
+/***********************/
+/* B 1.5.1 - Functions */
+/***********************/
+/*  FUNCTION derived_function_name ':' elementary_type_name io_OR_function_var_declarations_list function_body END_FUNCTION */
+void *visit(function_declaration_c *symbol) {return NULL;}
+
+
+/*****************************/
+/* B 1.5.2 - Function Blocks */
+/*****************************/
+/*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations fblock_body END_FUNCTION_BLOCK */
+void *visit(function_block_declaration_c *symbol) {return NULL;}
+
+
+/**********************/
+/* B 1.5.3 - Programs */
+/**********************/
+/*  PROGRAM program_type_name program_var_declarations_list function_block_body END_PROGRAM */
+void *visit(program_declaration_c *symbol) {return NULL;}
+
+
+
+
+/********************************/
+/* B 1.7 Configuration elements */
+/********************************/
+/*
+CONFIGURATION configuration_name
+   optional_global_var_declarations
+   (resource_declaration_list | single_resource_declaration)
+   optional_access_declarations
+   optional_instance_specific_initializations
+END_CONFIGURATION
+*/
+void *visit(configuration_declaration_c *symbol) {
+  if (symbol->global_var_declarations != NULL)
+    symbol->global_var_declarations->accept(*this);
+  symbol->resource_declarations->accept(*this);
+  return NULL;
+}
+
+
+/* intermediate helper symbol for configuration_declaration  */
+/*  { global_var_declarations_list }   */
+//void *visit(global_var_declarations_list_c *symbol) {return print_list(symbol);}
+//  use inherited iterator implementation
+
+/* helper symbol for configuration_declaration */
+/*| resource_declaration_list resource_declaration */
+//void *visit(resource_declaration_list_c *symbol) {return print_list(symbol);}
+//  use inherited iterator implementation
+
+
+/*
+RESOURCE resource_name ON resource_type_name
+   optional_global_var_declarations
+   single_resource_declaration
+END_RESOURCE
+*/
+void *visit(resource_declaration_c *symbol) {
+  s4o.print("ERROR: Resource declaratons are not yet supported\n");
+  return NULL;
+}
+
+
+
+}; /* class generate_data_c */
+
 
 
 /***********************************************************************/
@@ -763,11 +979,14 @@ class generate_json_c: public null_visitor_c {
 /* B 0 - Programming Model */
 /***************************/
 void *visit(library_c *symbol) {
+  generate_data_c      generate_data     (&s4o);
   generate_operation_c generate_operation(&s4o);
   
-  s4o.print(s4o.indent_spaces + "[\n");
+  s4o.print(s4o.indent_spaces + "[");
   s4o.indent_right();
+  symbol->accept(generate_data); 
   symbol->accept(generate_operation);
+  s4o.print("\n");
   s4o.indent_left();    
   s4o.print(s4o.indent_spaces + "]\n");
   
