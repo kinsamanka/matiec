@@ -544,7 +544,8 @@ void *print_inputargs(symbol_c *pou_decl) {
     function_param_iterator_c::param_direction_t parmdir;
     parmdir = param_iter.param_direction();
     if   ((parmdir != function_param_iterator_c::direction_out) 
-       && (parmdir != function_param_iterator_c::direction_inout))
+       && (parmdir != function_param_iterator_c::direction_inout)
+       && (parmdir != function_param_iterator_c::direction_in))
       continue;
     
     if (count != 0)
