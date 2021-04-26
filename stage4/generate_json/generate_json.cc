@@ -83,6 +83,401 @@ void stage4_print_options(void) {
 /***********************************************************************/
 
 
+
+
+
+class localvar_list_builder_c: public iterator_visitor_c {
+  public:
+    typedef symtable_c<symbol_c *> localvar_symtable_t;
+  
+  private:
+    localvar_symtable_t *current_localvar_list;
+
+  public:
+    localvar_list_builder_c(void) {current_localvar_list = NULL;}
+    ~localvar_list_builder_c(void) {}
+
+    void populate_list(localvar_symtable_t *localvar_list, symbol_c *pou_decl) {
+      current_localvar_list = localvar_list;
+      pou_decl->accept(*this);
+      current_localvar_list = NULL;
+      return;
+    }
+
+    
+  private:
+    void add_symbol_to_list(symbol_c *token) {
+      current_localvar_list->insert(token, token);
+    }  
+
+    void add_list_to_list(list_c *list) {
+      for(int i = 0; i < list->n; i++)
+        add_symbol_to_list(list->get_element(i));
+    }  
+
+
+/******************************************/
+/* B 1.4.3 - Declaration & Initialisation */
+/******************************************/
+/* VAR_INPUT [RETAIN | NON_RETAIN] input_declaration_list END_VAR */
+/* option -> the RETAIN/NON_RETAIN/<NULL> directive... */
+void *visit(input_declarations_c *symbol) {
+  if (typeid(*(symbol->method)) == typeid(explicit_definition_c))
+    symbol->input_declaration_list->accept(*this);
+  return NULL;
+}
+
+/* edge -> The F_EDGE or R_EDGE directive */
+void *visit(edge_declaration_c *symbol) {
+  return symbol->var1_list->accept(*this);  // points to a var1_list_c
+}
+
+/* EN : BOOL := 1 */
+void *visit(en_param_declaration_c *symbol) {
+  if (typeid(*(symbol->method)) == typeid(explicit_definition_c))
+    add_symbol_to_list(symbol->name);
+  return NULL;
+}
+
+/* ENO : BOOL */
+void *visit(eno_param_declaration_c *symbol) {
+  if (typeid(*(symbol->method)) == typeid(explicit_definition_c))
+    add_symbol_to_list(symbol->name);
+  return NULL;
+}
+
+
+/* one of the following...
+ *   var1_list ':' simple_specification
+ *   var1_list ':' subrange_spec_init
+ *   var1_list ':' enumerated_spec_init
+ * 
+ *   simple_specification -> simple_spec_init_c
+ *   subrange_spec_init   -> simple_spec_init_c
+ *   enumerated_spec_init -> enumerated_spec_init_c
+ *   var1_list            -> var1_list_c
+ */
+void *visit(var1_init_decl_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+
+void *visit(var1_list_c *symbol) {
+  add_list_to_list(symbol);
+  return NULL;
+}
+
+
+/* | [var1_list ','] variable_name '..' */
+/* NOTE: This is an extension to the standard!!! */
+/* In order to be able to handle extensible standard functions
+ * (i.e. standard functions that may have a variable number of
+ * input parameters, such as AND(word#33, word#44, word#55, word#66),
+ * we have extended the acceptable syntax to allow var_name '..'
+ * in an input variable declaration.
+ *
+ * This allows us to parse the declaration of standard
+ * extensible functions and load their interface definition
+ * into the abstract syntax tree just like we do to other 
+ * user defined functions.
+ * This has the advantage that we can later do semantic
+ * checking of calls to functions (be it a standard or user defined
+ * function) in (almost) exactly the same way.
+ *
+ * Of course, we have a flag that disables this syntax when parsing user
+ * written code, so we only allow this extra syntax while parsing the 
+ * 'header' file that declares all the standard IEC 61131-3 functions.
+ */
+void *visit(extensible_input_parameter_c *symbol) {
+  ERROR; // this should never get called, as this symbol should always be inside a var1_list_c
+  add_symbol_to_list(symbol->var_name);
+  return NULL;
+}
+
+
+/* var1_list ':' array_spec_init */
+void *visit(array_var_init_decl_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+
+/*  var1_list ':' initialized_structure */
+void *visit(structured_var_init_decl_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+/* name_list ':' function_block_type_name ASSIGN structure_initialization */
+/* structure_initialization -> may be NULL ! */
+void *visit(fb_name_decl_c *symbol) {
+  return symbol->fb_name_list->accept(*this); // points to fb_name_list_c
+}
+
+void *visit(fb_name_list_c *symbol) {
+  add_list_to_list(symbol);
+  return NULL;
+}
+
+
+/* VAR_OUTPUT [RETAIN | NON_RETAIN] var_init_decl_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(output_declarations_c *symbol) {
+  if (typeid(*(symbol->method)) == typeid(explicit_definition_c)) {
+    symbol->var_init_decl_list->accept(*this);
+  }
+  return NULL;
+}
+
+/*  VAR_IN_OUT  END_VAR */
+void *visit(input_output_declarations_c *symbol) {
+  return symbol->var_declaration_list->accept(*this);
+}
+
+/* helper symbol for input_output_declarations */
+/* var_declaration_list var_declaration ';' */
+// Leave it to underlying iterator_visitor_c
+//void *visit(var_declaration_list_c *symbol)
+
+/*  var1_list ':' array_specification */
+void *visit(array_var_declaration_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+/*  var1_list ':' structure_type_name */
+void *visit(structured_var_declaration_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+/* VAR [CONSTANT] var_init_decl_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(var_declarations_c *symbol) {
+  return symbol->var_init_decl_list->accept(*this);
+}
+
+/*  VAR RETAIN var_init_decl_list END_VAR */
+void *visit(retentive_var_declarations_c *symbol) {
+  return symbol->var_init_decl_list->accept(*this);
+}
+
+/*  VAR [CONSTANT|RETAIN|NON_RETAIN] located_var_decl_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(located_var_declarations_c *symbol) {
+  return symbol->located_var_decl_list->accept(*this);
+}
+
+/* helper symbol for located_var_declarations */
+/* located_var_decl_list located_var_decl ';' */
+// leave to the underlysing interator_visitor_c
+// void *visit(located_var_decl_list_c *symbol) {}
+
+/*  [variable_name] location ':' located_var_spec_init */
+/* variable_name -> may be NULL ! */
+void *visit(located_var_decl_c *symbol) {
+  if (symbol->variable_name != NULL) {
+    add_symbol_to_list(symbol->variable_name);
+  }
+  //symbol->location->accept(*this);
+  return NULL;
+}
+
+
+/*| VAR_EXTERNAL [CONSTANT] external_declaration_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(external_var_declarations_c *symbol) {
+  // External variables reference global variables 
+  // which we do NOT want to add to the list of local variabçes
+  // return symbol->external_declaration_list->accept(*this);
+  return NULL;
+}
+
+/* helper symbol for external_var_declarations */
+/*| external_declaration_list external_declaration';' */
+// leave to underlying iterator_visitor_c
+// void *visit(external_declaration_list_c *symbol)
+
+
+/*  global_var_name ':' (simple_specification|subrange_specification|enumerated_specification|array_specification|prev_declared_structure_type_name|function_block_type_name) */
+void *visit(external_declaration_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_name->accept(*this);
+  return NULL;
+}
+
+/*| VAR_GLOBAL [CONSTANT|RETAIN] global_var_decl_list END_VAR */
+/* option -> may be NULL ! */
+void *visit(global_var_declarations_c *symbol) {
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_decl_list->accept(*this);
+  return NULL;
+}
+
+/* helper symbol for global_var_declarations */
+/*| global_var_decl_list global_var_decl ';' */
+void *visit(global_var_decl_list_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_name->accept(*this);
+  return NULL;
+}
+
+/*| global_var_spec ':' [located_var_spec_init|function_block_type_name] */
+/* type_specification ->may be NULL ! */
+void *visit(global_var_decl_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_name->accept(*this);
+  return NULL;
+}
+
+/*| global_var_name location */
+void *visit(global_var_spec_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_name->accept(*this);
+  //symbol->global_var_name->accept(*this);
+  //symbol->location->accept(*this);
+  return NULL;
+}
+
+/*  AT direct_variable */
+void *visit(location_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  // symbol->global_var_name->accept(*this);
+  // symbol->direct_variable->accept(*this);
+  return NULL;
+}
+
+/*| global_var_list ',' global_var_name */
+void *visit(global_var_list_c *symbol) {
+  ERROR; // should never get called!
+  // we do NOT want to add global variables to the list
+  return NULL;
+  
+}
+
+/*  var1_list ':' single_byte_string_spec */
+void *visit(single_byte_string_var_declaration_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+
+/*  var1_list ':' double_byte_string_spec */
+void *visit(double_byte_string_var_declaration_c *symbol) {
+  return symbol->var1_list->accept(*this); // points to var1_list_c
+}
+
+
+/*| VAR [RETAIN|NON_RETAIN] incompl_located_var_decl_list END_VAR */
+/* option ->may be NULL ! */
+void *visit(incompl_located_var_declarations_c *symbol) {
+  return symbol->incompl_located_var_decl_list->accept(*this);
+}
+
+/* helper symbol for incompl_located_var_declarations */
+/*| incompl_located_var_decl_list incompl_located_var_decl ';' */
+// leave to underlying iterator_visitor_c
+// void *visit(incompl_located_var_decl_list_c *symbol)
+
+/*  variable_name incompl_location ':' var_spec */
+void *visit(incompl_located_var_decl_c *symbol) {
+  add_symbol_to_list(symbol->variable_name);
+  // symbol->incompl_location->accept(*this);
+  // symbol->var_spec->accept(*this);
+  return NULL;
+}
+
+
+/*  AT incompl_location_token */
+void *visit(incompl_location_c *symbol) {
+  ERROR; // should never get called!
+  return NULL;
+}
+
+
+/* intermediate helper symbol for:
+ *  - non_retentive_var_decls
+ *  - output_declarations
+ */
+/* | var_init_decl_list var_init_decl ';' */
+// leave to underlying iterator_visitor_c
+// void *visit(var_init_decl_list_c *symbol)
+
+
+/***********************/
+/* B 1.5.1 - Functions */
+/***********************/
+void *visit(function_declaration_c *symbol) {
+  // function name works as a local variable -> add it to the list
+  add_symbol_to_list(symbol->derived_function_name);
+  symbol->var_declarations_list->accept(*this);
+  // symbol->function_body->accept(*this);
+  return NULL;
+}
+
+/* (VAR xxxx_decl_list END_VAR)  <-- list of  */
+// leave to underlying iterator_visitor_c
+// void *visit(var_declarations_list_c *symbol) {return print_list(symbol);}
+
+/* (VAR [CONSTANT] var2_init_decl_list END_VAR)  <-- list of */
+// leave to underlying iterator_visitor_c
+// void *visit(function_var_decls_c *symbol)
+
+/* VAR [CONSTANT] var2_init_decl_list END_VAR  
+ *                ^^^^^^^^^^^^^^^^^^^
+ * intermediate helper symbol for function_var_decls 
+ */
+// leave to underlying iterator_visitor_c
+// void *visit(var2_init_decl_list_c *symbol)
+
+
+/*****************************/
+/* B 1.5.2 - Function Blocks */
+/*****************************/
+/*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations function_block_body END_FUNCTION_BLOCK */
+void *visit(function_block_declaration_c *symbol) {
+  return symbol->var_declarations->accept(*this);
+}
+
+/*  VAR_TEMP temp_var_decl_list END_VAR */
+void *visit(temp_var_decls_c *symbol) {
+  return symbol->var_decl_list->accept(*this);
+}
+
+// leave to underlying iterator_visitor_c
+/* intermediate helper symbol for temp_var_decls */
+// void *visit(temp_var_decls_list_c *symbol)
+
+/*  VAR NON_RETAIN var_init_decl_list END_VAR */
+void *visit(non_retentive_var_decls_c *symbol) {
+  return symbol->var_decl_list->accept(*this);
+}
+
+
+/**********************/
+/* B 1.5.3 - Programs */
+/**********************/
+/*  PROGRAM program_type_name program_var_declarations_list function_block_body END_PROGRAM */
+void *visit(program_declaration_c *symbol) {
+  return symbol->var_declarations->accept(*this);
+}
+
+
+
+}; // localvar_list_builder_c
+
+
+
+
+
+
+
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+
+
 class print_datatype_c: public iterator_visitor_c {
   private:
     stage4out_c &s4o;
@@ -456,8 +851,11 @@ void *visit(structured_variable_c *symbol) {
 class print_uses_c: public iterator_visitor_c {
   private:
     stage4out_c &s4o;
-    int count;  // number of POU calls already printed
-    /* A symbol table with all previously printed variables (so we don't print duplicates!)... */
+    int count;  // number of variables already printed
+    /* A symbol table with all previously printed variables (so we don't print duplicates!)...
+     * We start off be populating this list with all the local variables, as we simply don't
+     * want any local variable to be printed out.
+     */
     typedef symtable_c<symbol_c *> var_symtable_t;
     var_symtable_t var_symtable;
 
@@ -466,6 +864,19 @@ class print_uses_c: public iterator_visitor_c {
     ~print_uses_c(void) {}
     
    int get_count(void) {return count;}    
+   
+   void handle_pou(symbol_c *pou_decl, symbol_c *pou_body) {
+     /* We only want to print the non local variables,
+      * so we start off by adding all the local variables to 
+      * the list of variables we will NOT be printing out
+      * (or that have alreay been printed out once, so should
+      *  not be printed out again).
+      */
+     localvar_list_builder_c localvar_list_builder;
+     localvar_list_builder.populate_list(&var_symtable, pou_decl);
+     pou_body->accept(*this);
+     return;
+   }
 
 
   private:
@@ -567,6 +978,8 @@ class generate_operation_c: public iterator_visitor_c {
     stage4out_c       &s4o;
 
     
+    
+    
 void *print_token(symbol_c *token) {
   return s4o.print(token->token->value);
 }
@@ -578,7 +991,7 @@ void *print_datatype(symbol_c *datatype) {
 
 
 
-void *print_inputargs(symbol_c *pou_decl) {
+void *print_args(symbol_c *pou_decl) {
   function_param_iterator_c param_iter(pou_decl);
   int count = 0;
   
@@ -620,18 +1033,18 @@ void *print_calls(symbol_c *pou_decl) {
 
 
 
-void *print_uses(symbol_c *pou_body) {
+void *print_uses(symbol_c *pou_decl, symbol_c *pou_body) {
   print_uses_c print_uses(&s4o);
-  pou_body->accept(print_uses);
+  print_uses.handle_pou(pou_decl, pou_body);
   s4o.print("\n");
   return NULL;
 }
 
 
 
-void *print_operation(symbol_c *name,
+void *print_operation(symbol_c *pou_decl,
+                      symbol_c *name,
                       symbol_c *returns,
-                      symbol_c *args,
                       symbol_c *pou_body
                      ) {
   if (entry_count++ != 0) 
@@ -660,7 +1073,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"args\": [\n");
       s4o.indent_right();
-      print_inputargs(name->parent);   // name->parent will be the POU declaration
+      print_args(pou_decl);
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
 
@@ -687,7 +1100,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"calls\": [\n");
       s4o.indent_right();
-      print_calls(name->parent);  // name->parent will be the POU declaration
+      print_calls(pou_decl);
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
       
@@ -696,7 +1109,7 @@ void *print_operation(symbol_c *name,
       //  ],
       s4o.print(s4o.indent_spaces + "\"uses\": [\n");
       s4o.indent_right();
-      print_uses(pou_body);  // name->parent will be the POU declaration
+      print_uses(pou_decl, pou_body);  
       s4o.indent_left();    
       s4o.print(s4o.indent_spaces + "],\n");
       
@@ -737,7 +1150,7 @@ void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); r
 /***********************/
 /*  FUNCTION derived_function_name ':' elementary_type_name io_OR_function_var_declarations_list function_body END_FUNCTION */
 void *visit(function_declaration_c *symbol) {
-  return print_operation(symbol->derived_function_name, symbol->type_name, symbol->var_declarations_list, symbol->function_body);
+  return print_operation(symbol, symbol->derived_function_name, symbol->type_name, symbol->function_body);
 }
 
 
@@ -746,7 +1159,7 @@ void *visit(function_declaration_c *symbol) {
 /*****************************/
 /*  FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations fblock_body END_FUNCTION_BLOCK */
 void *visit(function_block_declaration_c *symbol) {
-  return print_operation(symbol->fblock_name, NULL, symbol->var_declarations, symbol->fblock_body);
+  return print_operation(symbol, symbol->fblock_name, NULL, symbol->fblock_body);
 }
 
 
@@ -755,7 +1168,7 @@ void *visit(function_block_declaration_c *symbol) {
 /**********************/
 /*  PROGRAM program_type_name program_var_declarations_list function_block_body END_PROGRAM */
 void *visit(program_declaration_c *symbol) {
-  return print_operation(symbol->program_type_name, NULL, symbol->var_declarations, symbol->function_block_body);
+  return print_operation(symbol, symbol->program_type_name, NULL, symbol->function_block_body);
 }
 
 
@@ -774,7 +1187,6 @@ void *visit(program_declaration_c *symbol) {
 
 
 class generate_data_c: public iterator_visitor_c {
-//class generate_operation_c: public visitor_c {
   private:
     stage4out_c       &s4o;
     symbol_c *current_param_type;
