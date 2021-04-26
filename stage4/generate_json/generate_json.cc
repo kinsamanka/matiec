@@ -40,7 +40,6 @@
 
 
 
-
 static int entry_count = 0;
 
 
@@ -56,6 +55,11 @@ static int entry_count = 0;
 #include "../../main.hh" // required for ERROR() and ERROR_MSG() macros.
 
 #include "../../absyntax_utils/absyntax_utils.hh"
+
+
+#define STAGE4_ERROR(symbol1, symbol2, ...)   {stage4err ("while generating JSON", symbol1, symbol2, __VA_ARGS__); exit(EXIT_FAILURE);}
+#define STAGE4_WARNING(symbol1, symbol2, ...) {stage4warn("while generating JSON", symbol1, symbol2, __VA_ARGS__);}
+
 
 /***********************************************************************/
 /***********************************************************************/
@@ -1377,7 +1381,7 @@ RESOURCE resource_name ON resource_type_name
 END_RESOURCE
 */
 void *visit(resource_declaration_c *symbol) {
-  s4o.print("ERROR: Resource declaratons are not yet supported\n");
+  STAGE4_WARNING(symbol, symbol, "resource declaratons are not yet supported.\n");
   return NULL;
 }
 
