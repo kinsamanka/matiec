@@ -3894,7 +3894,9 @@ var1_list:
 	 variable_name_symtable.insert($1, prev_declared_variable_name_token);
 	}
 | variable_name integer DOTDOT
-	{$$ = new var1_list_c(locloc(@$)); $$->add_element(new extensible_input_parameter_c($1, $2, locloc(@$)));
+	{symbol_c *inparm = new extensible_input_parameter_c($1, $2, locloc(@$));
+	 inparm->token = $1->token;
+	 $$ = new var1_list_c(locloc(@$)); $$->add_element(inparm);
 	 variable_name_symtable.insert($1, prev_declared_variable_name_token);
 	 if (!allow_extensible_function_parameters) print_err_msg(locf(@1), locl(@2), "invalid syntax in variable name declaration.");
 	}
@@ -3903,7 +3905,9 @@ var1_list:
 	 variable_name_symtable.insert($3, prev_declared_variable_name_token);
 	}
  | var1_list ',' variable_name integer DOTDOT
-	{$$ = $1; $$->add_element(new extensible_input_parameter_c($3, $4, locloc(@$)));
+	{symbol_c *inparm = new extensible_input_parameter_c($3, $4, locloc(@$));
+	 inparm->token = $3->token;
+	 $$ = $1; $$->add_element(inparm);
 	 variable_name_symtable.insert($3, prev_declared_variable_name_token);
 	 if (!allow_extensible_function_parameters) print_err_msg(locf(@1), locl(@2), "invalid syntax in variable name declaration.");
 	}
