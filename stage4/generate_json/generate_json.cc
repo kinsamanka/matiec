@@ -45,6 +45,7 @@ static int entry_count = 0;
 
 
 // #include <stdio.h>  /* required for NULL */
+#include <string.h>  // strdup(), strchr()
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -888,8 +889,26 @@ class print_uses_c: public iterator_visitor_c {
     
 void *print_token(const char *varname, symbol_c *symbol) {
   if (var_symtable.count(varname) != 0)
-    return NULL; // already printed previously
+    return NULL; // already printed previously, or is a local variable
 
+  char *varx = strdup(varname);
+  if (NULL == varx) ERROR;
+  
+  char *tmp = strchr(varx, '.')  ;
+  if (tmp != NULL) {
+    /* varname is a structured variable, e.g. 'varx.field1.field2'
+     * If it is a local variable it would have been declared as only
+     * 'varx', so we must search for 'varx' by itself in the var_symtable
+     */
+    // the following code is ugly, but let's get it working quickly...
+    *tmp = '\0';
+    if (var_symtable.count(varx) != 0) {
+      free(varx);
+      return NULL; // already printed previously, or is a local variable
+    }
+  }
+  free(varx);
+  
   var_symtable.insert(varname, symbol);
   
   if (count != 0)
