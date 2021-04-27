@@ -7903,7 +7903,16 @@ function_invocation:
 /* B 3.2 Statements */
 /********************/
 statement_list:
-  statement ';'
+';'
+	{ if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "';' with no preceding statement."); 
+	    yynerrs++;
+	    $$ = NULL;
+	  } else {
+	    $$ = new statement_list_c(locloc(@$));
+	  }
+	}  
+| statement ';'
 	{$$ = new statement_list_c(locloc(@$)); $$->add_element($1);}
 | any_pragma
 	{$$ = new statement_list_c(locloc(@$)); $$->add_element($1);}
