@@ -8108,10 +8108,31 @@ param_assignment_formal:
 	{$$ = new input_variable_param_assignment_c($1, $3, locloc(@$));}
 | en_identifier ASSIGN expression
 	{$$ = new input_variable_param_assignment_c($1, $3, locloc(@$));}
+| any_identifier ASSIGN
+	{$$ = new input_variable_param_assignment_c($1, NULL, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "Missing expression in ST formal invocation parameter assignment."
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
+| en_identifier ASSIGN
+	{$$ = new input_variable_param_assignment_c($1, NULL, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "Missing expression in ST formal invocation parameter assignment."
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
 /*| variable_name SENDTO variable */
 /*| any_identifier SENDTO variable */
 | sendto_identifier SENDTO
 	{$$ = new output_variable_param_assignment_c(NULL, $1, NULL, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "Expecting variable in which to store output value."
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
 	}
 | sendto_identifier SENDTO variable
 	{$$ = new output_variable_param_assignment_c(NULL, $1, $3, locloc(@$));}
@@ -8146,6 +8167,7 @@ param_assignment_formal:
 	{$$ = new output_variable_param_assignment_c(new not_paramassign_c(locloc(@$)), $2, $4, locloc(@$));}
 */
 /* ERROR_CHECK_BEGIN */
+/*  Commented out as it was generating conflicts with the rule "| sendto_identifier SENDTO" above
 | any_identifier ASSIGN error
   {$$ = NULL;
 	 if (is_current_syntax_token()) {print_err_msg(locl(@2), locf(@3), "no expression defined in ST formal parameter assignment.");}
@@ -8158,6 +8180,7 @@ param_assignment_formal:
 	 else {print_err_msg(locf(@3), locl(@3), "invalid expression in ST formal parameter assignment."); yyclearin;}
 	 yyerrok;
 	}
+*/
 /*  Commented out as it was generating conflicts with the rule "| sendto_identifier SENDTO" above
 | sendto_identifier SENDTO error
   {$$ = NULL;
