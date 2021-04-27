@@ -8275,7 +8275,23 @@ elseif_statement:
 
 
 case_statement:
-  CASE expression OF case_element_list END_CASE
+  CASE ':' expression OF case_element_list END_CASE
+	{$$ = new case_statement_c($3, $5, NULL, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "CASE cannot be followed by ':'"
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
+| CASE ':' expression OF case_element_list ELSE statement_list END_CASE
+	{$$ = new case_statement_c($3, $5, $7, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "CASE cannot be followed by ':'"
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
+| CASE expression OF case_element_list END_CASE
 	{$$ = new case_statement_c($2, $4, NULL, locloc(@$));}
 | CASE expression OF case_element_list ELSE statement_list END_CASE
 	{$$ = new case_statement_c($2, $4, $6, locloc(@$));}
