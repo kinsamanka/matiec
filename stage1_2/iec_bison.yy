@@ -3015,6 +3015,14 @@ array_specification:
   prev_declared_array_type_name
 | ARRAY '[' array_subrange_list ']' OF non_generic_type_name
 	{$$ = new array_specification_c($3, $6, locloc(@$));}
+| ARRAY '[' array_subrange_list ']' OF function_block_type_name
+	{$$ = new array_specification_c($3, $6, locloc(@$));
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "Arrays of Function Blocks is not allowed."
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
 | ARRAY '[' array_subrange_list ']' OF ref_spec_non_recursive
 	/* non standard extension: Allow use of arrays storing REF_TO datatypes that are declared as 'ARRAY [1..3] OF REF_TO INT' */
 	/*                                                                                                            ^^^^^^      */
