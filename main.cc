@@ -184,7 +184,8 @@ int main(int argc, char **argv) {
     case 'r': runtime_options.ref_standard_extensions  = true;  break;
     case 'a': runtime_options.nonliteral_in_array_size = true;  break;
     case 'b': runtime_options.allow_void_datatype      = true;  break;
-    case 'C': runtime_options.allow_codesys_compatible = true;  break;
+    case 'C': runtime_options.allow_codesys_compatible = true;  
+              runtime_options.nested_comments          = true;  break; // Codesys compatibility => nested comments
     case 'i': runtime_options.allow_missing_var_in     = true;  break;
     case 'c': runtime_options.conversion_functions     = true;  break;
     case 'n': runtime_options.nested_comments          = true;  break;
