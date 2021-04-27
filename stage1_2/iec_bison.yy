@@ -8110,6 +8110,9 @@ param_assignment_formal:
 	{$$ = new input_variable_param_assignment_c($1, $3, locloc(@$));}
 /*| variable_name SENDTO variable */
 /*| any_identifier SENDTO variable */
+| sendto_identifier SENDTO
+	{$$ = new output_variable_param_assignment_c(NULL, $1, NULL, locloc(@$));
+	}
 | sendto_identifier SENDTO variable
 	{$$ = new output_variable_param_assignment_c(NULL, $1, $3, locloc(@$));}
 /* The following is not required, as the sendto_identifier_token returned by flex will 
@@ -8155,20 +8158,22 @@ param_assignment_formal:
 	 else {print_err_msg(locf(@3), locl(@3), "invalid expression in ST formal parameter assignment."); yyclearin;}
 	 yyerrok;
 	}
+/*  Commented out as it was generating conflicts with the rule "| sendto_identifier SENDTO" above
 | sendto_identifier SENDTO error
   {$$ = NULL;
 	 if (is_current_syntax_token()) {print_err_msg(locl(@2), locf(@3), "no expression defined in ST formal parameter out assignment.");}
 	 else {print_err_msg(locf(@3), locl(@3), "invalid expression in ST formal parameter out assignment."); yyclearin;}
 	 yyerrok;
 	}
-/*
+*/
+/***
 | eno_identifier SENDTO error
   {$$ = NULL;
 	 if (is_current_syntax_token()) {print_err_msg(locl(@2), locf(@3), "no expression defined in ST formal parameter out assignment.");}
 	 else {print_err_msg(locf(@3), locl(@3), "invalid expression in ST formal parameter out assignment."); yyclearin;}
 	 yyerrok;
 	}
-*/
+***/
 | NOT SENDTO variable
   {$$ = NULL; print_err_msg(locl(@1), locf(@2), "no parameter name defined in ST formal parameter out negated assignment."); yynerrs++;}
 | NOT error SENDTO variable
