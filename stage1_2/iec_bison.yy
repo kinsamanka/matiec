@@ -826,6 +826,8 @@ typedef struct YYLTYPE {
 /*********************/
 %type  <leaf>	variable
 %type  <leaf>	symbolic_variable
+/* helper symbol for symbolic_variable */
+%type  <leaf>	deref_operator
 /* helper symbol for prog_cnxn */
 %type  <leaf>	any_symbolic_variable
 %type  <leaf>	variable_name
@@ -1410,6 +1412,7 @@ typedef struct YYLTYPE {
 %type <leaf>	param_assignment_formal
 %type <leaf>	param_assignment_nonformal
 /* helper symbols for fb_invocation */
+%type <leaf>	fb_variable_ref
 %type <list> param_assignment_formal_list
 %type <list> param_assignment_nonformal_list
 
@@ -3556,15 +3559,23 @@ symbolic_variable:
 | identifier
 	{$$ = new symbolic_variable_c($1, locloc(@$)); $$->token = $1->token;}
 */
-| symbolic_variable '^'     
+| deref_operator     
+;
+
+
+/* helper symbol for symbolic_variable */
+deref_operator:
+  symbolic_variable '^'     
 	/* Dereferencing operator defined in IEC 61131-3 v3. However, implemented here differently then how it is defined in the standard! See following note for explanation! */
 	{$$ = new deref_operator_c($1, locloc(@$));
 	 if (!allow_ref_dereferencing) {
 	   print_err_msg(locf(@$), locl(@$), "Derefencing REF_TO datatypes with '^' is not allowed (use -r option to activate support for this IEC 61131-3 v3 feature)."); 
 	   yynerrs++;
 	 }
-}
+    }
 ;
+
+
 /*
  * NOTE: The syntax defined in the v3 standard for the dereferencing operator '^' seems to me to be un-intentionally
  *       limited. For example
@@ -7965,25 +7976,48 @@ return_statement:
 
 
 
+fb_variable_ref:
+  prev_declared_fb_name
+| multi_element_variable
+	{ $$ = $1;
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "Calling a FB from a multi-element variable is not allowed."
+	                                      "Activate 'Codesys compatibility' option to allow this syntax."); 
+	    yynerrs++;
+	  }
+	}
+| deref_operator
+;
+
+
+
 fb_invocation:
+/*
   prev_declared_fb_name '(' ')'
 	{$$ = new fb_invocation_c($1, NULL, NULL, locloc(@$));	}
 | prev_declared_fb_name '(' param_assignment_formal_list ')'
 	{$$ = new fb_invocation_c($1, $3, NULL, locloc(@$));}
 | prev_declared_fb_name '(' param_assignment_nonformal_list ')'
 	{$$ = new fb_invocation_c($1, NULL, $3, locloc(@$));}
+*/
+  fb_variable_ref '(' ')'
+	{$$ = new fb_invocation_c($1, NULL, NULL, locloc(@$));	}
+| fb_variable_ref '(' param_assignment_formal_list ')'
+	{$$ = new fb_invocation_c($1, $3, NULL, locloc(@$));}
+| fb_variable_ref '(' param_assignment_nonformal_list ')'
+	{$$ = new fb_invocation_c($1, NULL, $3, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
-| prev_declared_fb_name ')'
+| fb_variable_ref ')'
 	{$$ = NULL; print_err_msg(locl(@1), locf(@2), "'(' missing after function block name in ST statement."); yynerrs++;}
-| prev_declared_fb_name param_assignment_formal_list ')'
+| fb_variable_ref param_assignment_formal_list ')'
 	{$$ = NULL; print_err_msg(locl(@1), locf(@2), "'(' missing after function block name in ST statement."); yynerrs++;}
-| prev_declared_fb_name '(' error ')'
+| fb_variable_ref '(' error ')'
 	{$$ = NULL; print_err_msg(locf(@3), locl(@3), "invalid parameter list in function block invocation in ST statement."); yyerrok;}
-| prev_declared_fb_name '(' error
+| fb_variable_ref '(' error
 	{$$ = NULL; print_err_msg(locl(@2), locf(@3), "')' missing after parameter list of function block invocation in ST statement."); yyerrok;}
-| prev_declared_fb_name '(' param_assignment_formal_list error
+| fb_variable_ref '(' param_assignment_formal_list error
 	{$$ = NULL; print_err_msg(locl(@3), locf(@4), "')' missing after parameter list of function block invocation in ST statement."); yyerrok;}
-| prev_declared_fb_name '(' param_assignment_nonformal_list error
+| fb_variable_ref '(' param_assignment_nonformal_list error
 	{$$ = NULL; print_err_msg(locl(@3), locf(@4), "')' missing after parameter list of function block invocation in ST statement."); yyerrok;}
 /* ERROR_CHECK_END */
 ;
@@ -8165,6 +8199,8 @@ if_statement:
 	{$$ = new if_statement_c($2, $4, $5, NULL, locloc(@$));}
 | IF expression THEN statement_list elseif_statement_list ELSE statement_list END_IF
 	{$$ = new if_statement_c($2, $4, $5, $7, locloc(@$));}
+| IF expression THEN statement_list elseif_statement_list ELSE  END_IF
+	{$$ = new if_statement_c($2, $4, $5, NULL, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | IF THEN statement_list elseif_statement_list END_IF
   {$$ = NULL; print_err_msg(locl(@1), locf(@2), "no test expression defined in ST 'IF' statement."); yynerrs++;}
@@ -8182,8 +8218,10 @@ if_statement:
   {$$ = NULL; print_err_msg(locl(@3), locf(@4), "no statement defined after 'THEN' in ST 'IF' statement."); yynerrs++;}
 | IF expression THEN elseif_statement_list ELSE statement_list END_IF
   {$$ = NULL; print_err_msg(locl(@3), locf(@4), "no statement defined after 'THEN' in ST 'IF' statement."); yynerrs++;}
+/*
 | IF expression THEN statement_list elseif_statement_list ELSE END_IF
   {$$ = NULL; print_err_msg(locl(@6), locf(@7), "no statement defined after 'ELSE' in ST 'IF' statement."); yynerrs++;}
+*/
 | IF expression THEN statement_list elseif_statement_list ELSE error END_IF
   {$$ = NULL; print_err_msg(locf(@7), locl(@7), "invalid statement defined after 'ELSE' in ST 'IF' statement."); yynerrs++; yyerrok;}
 | IF expression error END_OF_INPUT
