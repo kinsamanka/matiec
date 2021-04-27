@@ -40,6 +40,10 @@
 
 typedef struct {
    /* options specific to stage1_2 */
+	bool allow_codesys_compatible; /* Allow extensions in ST syntax introduced by Codesy:
+                                    *   - empty statement (simple ';' with no previous statement)
+                                    *   - arrays of Function_Block !! (including calling these FBs)
+	                                */
 	bool allow_void_datatype;      /* Allow declaration of functions returning VOID  */
 	bool allow_missing_var_in;     /* Allow definition and invocation of POUs with no input, output and in_out parameters! */
 	bool disable_implicit_en_eno;  /* Disable the generation of implicit EN and ENO parameters on functions and Function Blocks */
