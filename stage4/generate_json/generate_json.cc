@@ -767,7 +767,12 @@ void *visit(function_invocation_c *symbol) {
 
 /* fb_name '(' [param_assignment_list] ')' */
 void *visit(fb_invocation_c *symbol) {
-  print_token(symbol->fb_name);
+  /* NOTE: symbol->fb_name may be an array or structured variable, or a simple variable.
+   *       it is NOT the FB type, but rather the FB instance.
+   *       What we need to print out is the FB type!
+   */
+  if (NULL != symbol->called_fb_declaration)
+    print_token(symbol->called_fb_declaration);
   // recursively visit all ther symbols in the AST
   /* If the syntax parser is working correctly, at most one of the 
    * following two symbols will be NULL, while the other is != NULL.
