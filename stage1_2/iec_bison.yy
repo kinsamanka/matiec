@@ -5049,6 +5049,7 @@ function_declaration:
 /* POST_PARSING and STANDARD_PARSING: The rules expected to be applied after the preparser has finished. */
 | function_name_declaration ':' elementary_type_name io_OR_function_var_declarations_list function_body END_FUNCTION
 	{$$ = new function_declaration_c($1, $3, $4, $5, locloc(@$));
+	 $$->token = $1->token;
 	 if (!runtime_options.disable_implicit_en_eno) add_en_eno_param_decl_c::add_to($$); /* add EN and ENO declarations, if not already there */
 	 variable_name_symtable.pop();
 	 direct_variable_symtable.pop();
@@ -5057,6 +5058,7 @@ function_declaration:
 /* | FUNCTION derived_function_name ':' derived_type_name io_OR_function_var_declarations_list function_body END_FUNCTION */
 | function_name_declaration ':' derived_type_name io_OR_function_var_declarations_list function_body END_FUNCTION
 	{$$ = new function_declaration_c($1, $3, $4, $5, locloc(@$));
+	 $$->token = $1->token;
 	 if (!runtime_options.disable_implicit_en_eno) add_en_eno_param_decl_c::add_to($$); /* add EN and ENO declarations, if not already there */
 	 variable_name_symtable.pop();
 	 direct_variable_symtable.pop();
@@ -5065,6 +5067,7 @@ function_declaration:
 /* | FUNCTION derived_function_name ':' VOID io_OR_function_var_declarations_list function_body END_FUNCTION */
 | function_name_declaration ':' VOID io_OR_function_var_declarations_list function_body END_FUNCTION
 	{$$ = new function_declaration_c($1, new void_type_name_c(locloc(@3)), $4, $5, locloc(@$));
+	 $$->token = $1->token;
 	 if (!runtime_options.disable_implicit_en_eno) add_en_eno_param_decl_c::add_to($$); /* add EN and ENO declarations, if not already there */
 	 variable_name_symtable.pop();
 	 direct_variable_symtable.pop();
@@ -5276,6 +5279,7 @@ function_block_declaration:
 /* POST_PARSING: The rules expected to be applied after the preparser runs. Will only run if pre-parsing command line option is ON. */
 | FUNCTION_BLOCK prev_declared_derived_function_block_name io_OR_other_var_declarations_list function_block_body END_FUNCTION_BLOCK
 	{$$ = new function_block_declaration_c($2, $3, $4, locloc(@$));
+	 $$->token = $2->token;
 	 if (!runtime_options.disable_implicit_en_eno) add_en_eno_param_decl_c::add_to($$); /* add EN and ENO declarations, if not already there */
 	 /* Clear the variable_name_symtable. Since we have finished parsing the function block,
 	  * the variable names are now out of scope, so are no longer valid!
@@ -5286,6 +5290,7 @@ function_block_declaration:
 /* STANDARD_PARSING: The rules expected to be applied in single-phase parsing. Will only run if pre-parsing command line option is OFF. */
 | FUNCTION_BLOCK derived_function_block_name io_OR_other_var_declarations_list function_block_body END_FUNCTION_BLOCK
 	{$$ = new function_block_declaration_c($2, $3, $4, locloc(@$));
+	 $$->token = $2->token;
 	 library_element_symtable.insert($2, prev_declared_derived_function_block_name_token);
 	 if (!runtime_options.disable_implicit_en_eno) add_en_eno_param_decl_c::add_to($$); /* add EN and ENO declarations, if not already there */
 	 /* Clear the variable_name_symtable. Since we have finished parsing the function block,
@@ -5458,6 +5463,7 @@ program_declaration:
 /* POST_PARSING: The rules expected to be applied after the preparser runs. Will only run if pre-parsing command line option is ON. */
 | PROGRAM prev_declared_program_type_name program_var_declarations_list function_block_body END_PROGRAM
 	{$$ = new program_declaration_c($2, $3, $4, locloc(@$));
+	 $$->token = $2->token;
 	 /* Clear the variable_name_symtable. Since we have finished parsing the program declaration,
 	  * the variable names are now out of scope, so are no longer valid!
 	  */
@@ -5467,6 +5473,7 @@ program_declaration:
 /* STANDARD_PARSING: The rules expected to be applied in single-phase parsing. Will only run if pre-parsing command line option is OFF. */
 | PROGRAM program_type_name {library_element_symtable.insert($2, prev_declared_program_type_name_token);} program_var_declarations_list function_block_body END_PROGRAM
 	{$$ = new program_declaration_c($2, $4, $5, locloc(@$));
+	 $$->token = $2->token;
 	 /* Clear the variable_name_symtable. Since we have finished parsing the program declaration,
 	  * the variable names are now out of scope, so are no longer valid!
 	  */
