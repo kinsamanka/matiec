@@ -40,8 +40,8 @@
 
 
 
-static int entry_count = 0;
-
+static int  entry_count = 0;
+static bool enable_print = true;
 
 
 // #include <stdio.h>  /* required for NULL */
@@ -1075,6 +1075,9 @@ void *print_operation(symbol_c *pou_decl,
                       symbol_c *returns,
                       symbol_c *pou_body
                      ) {
+  if (!enable_print) 
+    return NULL;
+  
   if (entry_count++ != 0) 
     s4o.print(",");
   s4o.print("\n");
@@ -1168,8 +1171,8 @@ void *print_operation(symbol_c *pou_decl,
 /********************/
 /* 2.1.6 - Pragmas  */
 /********************/
-void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); return NULL;}
-void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); return NULL;} 
+void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); enable_print = true;  return NULL;}
+void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); enable_print = false; return NULL;} 
     
     
 
@@ -1234,6 +1237,9 @@ void *print_datatype(symbol_c *datatype) {
 void *print_data(symbol_c *name,
                  symbol_c *datatype
                  ) {
+  if (!enable_print) 
+    return NULL;
+  
   if (entry_count++ != 0) 
     s4o.print(",");
   s4o.print("\n");
@@ -1296,8 +1302,8 @@ void *print_data(symbol_c *name,
 /********************/
 /* 2.1.6 - Pragmas  */
 /********************/
-void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); return NULL;}
-void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); return NULL;} 
+void *visit( enable_code_generation_pragma_c * symbol)  {s4o. enable_output(); enable_print = true;  return NULL;}
+void *visit(disable_code_generation_pragma_c * symbol)  {s4o.disable_output(); enable_print = false; return NULL;} 
     
     
 
