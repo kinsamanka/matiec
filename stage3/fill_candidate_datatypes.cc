@@ -2279,10 +2279,34 @@ void *fill_candidate_datatypes_c::visit(assignment_statement_c *symbol) {
 /* B 3.2.2 Subprogram Control Statements */
 /*****************************************/
 void *fill_candidate_datatypes_c::visit(fb_invocation_c *symbol) {
-	symbol_c *fb_decl = search_var_instance_decl->get_basetype_decl(symbol->fb_name);
-	if (! get_datatype_info_c::is_function_block(fb_decl )) fb_decl = NULL;
-	if (NULL == fb_decl) ERROR; /* Although a call to a non-declared FB is a semantic error, this is currently caught by stage 2! */
+	/* symbol->fb_name is one of the following: 
+	 *   - array_variable_c
+	 *   - structured_variable_c
+	 *   - deref_operator_c
+	 *   - identifier_c
+	 */
+	symbol->fb_name->accept(*this);
 	
+	symbol_c *fb_decl = NULL;
+	
+	switch (symbol->fb_name->candidate_datatypes.size()) {
+		case 0:	/* if it is an identifier_c, then we will not be able to find possible datatypes, so we do it explicitly here... */
+				fb_decl = search_var_instance_decl->get_basetype_decl(symbol->fb_name);
+				break;
+		case 1:	fb_decl = symbol->fb_name->candidate_datatypes[0];
+				break;
+		default:fb_decl = NULL;
+	} // switch()
+
+	// Make sure the candidate datatype is a FB type declaration.
+	if (! get_datatype_info_c::is_function_block(fb_decl)) fb_decl = NULL;
+
+	/* Although a call to a non-declared FB is a semantic error, this was at first being caught by stage 2!
+	 * However, with the addition of support for Codesys extensions (namely arrays of FB, FB in a structured variable)
+	 * the above semantic error is no longer being caught by stage2, so the assertion is no longer valid
+	 */
+	//if (NULL == fb_decl) ERROR;
+
 	if (symbol->   formal_param_list != NULL) symbol->formal_param_list->accept(*this);
 	if (symbol->nonformal_param_list != NULL) symbol->nonformal_param_list->accept(*this);
 

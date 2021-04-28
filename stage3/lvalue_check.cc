@@ -344,7 +344,13 @@ void lvalue_check_c::check_formal_call(symbol_c *f_call, symbol_c *f_decl) {
 
 		/* Obtaining the value being passed in the function call */
 		symbol_c *call_param_value = fcp_iterator.get_current_value();
-		if (NULL == call_param_value) ERROR;
+		/* The standard IEC 61131-3 syntax does not allow a NULL parameter value (e.g. FooFB(parm1 :=, parm2 =>);)
+		 * However, with the Codesys compatibility extensions the above is now allowed.
+		 * This means that the following assertion is no longer valid
+		 */
+		//if (NULL == call_param_value) ERROR;
+		if (NULL == call_param_value) 
+			continue;
 
 		/* Find the corresponding parameter in function declaration, and it's direction (IN, OUT, IN_OUT) */
 		identifier_c *param_name = fp_iterator.search(call_param_name);

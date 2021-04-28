@@ -143,11 +143,23 @@ void print_datatypes_error_c::handle_function_invocation(symbol_c *fcall, generi
 
 	symbol_c *f_decl = fcall_data.called_function_declaration;
 	if ((NULL == f_decl) && (generic_function_call_t::POU_FB ==fcall_data.POU_type)) {
-		/* Due to the way the syntax analysis is buit (i.e. stage 2), this should never occur. */
-		/* I.e., a FB invocation using an undefined FB variable is not possible in the current implementation of stage 2. */
-		ERROR;
+		/* Due to the way the syntax analysis is built when parsing (by stage 2) standard IEC 61131-3 syntax, 
+		 * this should never occur. However, with codesys_compatibility option enabled arrays of FBs and FBs in
+		 * structures are allowed, which means that stage 2 can no longer guarantee that the (array and/or structured) 
+		 * variable used for calling the FB actually contains a FB instance. It is up to stage 3 to check that the 
+		 * datatypes are compatible.
+		 * The above assertion therefone no longer holds.
+		 *
+		 * I.e., with codesys_compatibility option disabled:
+		 *   a FB invocation using an undefined FB variable is not possible in the current implementation of stage 2. 
+		 * with codesys_compatibility option enabled:
+		 *   a FB invocation using an undefined variable allowed by stage 2. 
+		 *   e.g.: VAR  foo: ARRAY [1..2] OF INT;
+		 *         foo[1](parm1:=33);   <--- allowed by stage 2
+		 */
+		//ERROR;
 	}
-	if (NULL == f_decl) {
+	if ((NULL == f_decl) && (generic_function_call_t::POU_function ==fcall_data.POU_type)) {
 		/* we now try to find any function declaration with the same name, just so we can provide some relevant error messages */
 		function_symtable_t::iterator lower = function_symtable.lower_bound(fcall_data.function_name);
 		if (lower == function_symtable.end()) ERROR;
@@ -161,6 +173,18 @@ void print_datatypes_error_c::handle_function_invocation(symbol_c *fcall, generi
 			while ((param_name = fcp_iterator.next_f()) != NULL) {
 				param_value = fcp_iterator.get_current_value();
 				
+				/* when parsing with the codesys_compatibility option enabled, param_value may be NULL
+				 * as formal invocations with empty parameter values are allowed by Codesys!
+				 * e.g.  fooFB(IN1 :=, OUT1 =>);    <-- is considered valid with codesys_compatibility enabled
+				 * 
+				 * When parsing with the codesys_compatibility option disabled, the parser should never
+				 * allow param_value to be NULL
+				 */
+				if ((runtime_options.allow_codesys_compatible) && (param_value == NULL))
+					continue;
+				if (param_value == NULL)
+					ERROR;
+
 				/* Check if there are duplicate parameter values */
 				if(fcp_iterator.search_f(param_name) != param_value) {
 					function_invocation_error = true;

@@ -216,8 +216,13 @@ void narrow_candidate_datatypes_c::narrow_formal_call(symbol_c *f_call, symbol_c
 
 		/* Obtaining the value being passed in the function call */
 		call_param_value = fcp_iterator.get_current_value();
-		/* the following should never occur. If it does, then we have a bug in our code... */
-		if (NULL == call_param_value) ERROR;
+		/* The standard IEC 61131-3 syntax does not allow a NULL parameter value (e.g. FooFB(parm1 :=, parm2 =>);)
+		 * However, with the Codesys compatibility extensions the above is now allowed.
+		 * This means that the following assertion is no longer valid
+		 */
+		//if (NULL == call_param_value) ERROR;
+		if (NULL == call_param_value) 
+			continue;
 
 		/* Find the corresponding parameter in function declaration */
 		param_name = fp_iterator.search(call_param_name);
@@ -1694,19 +1699,12 @@ void *narrow_candidate_datatypes_c::visit(assignment_statement_c *symbol) {
 /*****************************************/
 
 void *narrow_candidate_datatypes_c::visit(fb_invocation_c *symbol) {
-	/* Note: We do not use the symbol->called_fb_declaration value (set in fill_candidate_datatypes_c)
-	 *       because we try to identify any other datatype errors in the expressions used in the 
-	 *       parameters to the FB call (e.g.  fb_var(var1 * 56 + func(var * 43)) )
-	 *       even it the call to the FB is invalid. 
-	 *       This makes sense because it may be errors in those expressions which are
-	 *       making this an invalid call, so it makes sense to point them out to the user!
-	 */
-	symbol_c *fb_decl = search_varfb_instance_type->get_basetype_decl(symbol->fb_name);
+	symbol_c *fb_decl = symbol->called_fb_declaration;
 
-	/* Although a call to a non-declared FB is a semantic error, this is currently caught by stage 2! */
-	if (NULL == fb_decl) ERROR;
-	if (NULL != symbol->nonformal_param_list)  narrow_nonformal_call(symbol, fb_decl);
-	if (NULL != symbol->   formal_param_list)     narrow_formal_call(symbol, fb_decl);
+	if (NULL != fb_decl) {
+		if (NULL != symbol->nonformal_param_list)  narrow_nonformal_call(symbol, fb_decl);
+		if (NULL != symbol->   formal_param_list)     narrow_formal_call(symbol, fb_decl);
+	}
 
 	return NULL;
 }
