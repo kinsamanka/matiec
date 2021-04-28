@@ -7927,11 +7927,11 @@ statement_list:
 	    $$ = new statement_list_c(locloc(@$));
 	  }
 	}  
-| statement ';'
+| statement
 	{$$ = new statement_list_c(locloc(@$)); $$->add_element($1);}
 | any_pragma
 	{$$ = new statement_list_c(locloc(@$)); $$->add_element($1);}
-| statement_list statement ';'
+| statement_list statement
 	{$$ = $1; $$->add_element($2);}
 | statement_list any_pragma
 	{$$ = $1; $$->add_element($2);}
@@ -7949,11 +7949,25 @@ statement_list:
 
 
 statement:
-  assignment_statement
-| subprogram_control_statement
+  assignment_statement ';'
+| subprogram_control_statement ';'
 | selection_statement
+	{ $$ = $1;
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "expecting ';'"); 
+	    yynerrs++;
+	  }
+	}  
+| selection_statement ';'
 | iteration_statement
-| function_invocation 
+	{ $$ = $1;
+	  if (!runtime_options.allow_codesys_compatible) {
+	    print_err_msg(locf(@1), locl(@1), "expecting ';'"); 
+	    yynerrs++;
+	  }
+	}  
+| iteration_statement ';'
+| function_invocation ';'
 	{ /* This is a non-standard extension (calling a function outside an ST expression!) */
 	  /* Only allow this if command line option has been selected...                     */
 	  $$ = $1; 
