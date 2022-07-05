@@ -1,0 +1,14 @@
+{
+  "name": "tool-matiec",
+  "version": "0.1.0",
+  "description": "An IEC 61131-3 compiler",
+  "keywords": [
+    "tools"
+  ],
+  "homepage": "https://bitbucket.org/mjsousa/matiec_git/src/master",
+  "license": "GPLv3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinsamanka/matiec"
+  }
+}
