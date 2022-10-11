@@ -29,6 +29,7 @@
 #ifndef _IEC_STD_FUNCTIONS_H
 #define _IEC_STD_FUNCTIONS_H
 
+#include <limits.h>
 
 /*****************************************************************/
 /*****************************************************************/
@@ -349,20 +350,32 @@ __ANY_NBIT(__to_anyuint_)
 /***********************************/  
 
 /* workaround for va-args limitation on shorter than int params */
-#define VA_ARGS_REAL LREAL
-#define VA_ARGS_LREAL LREAL
+
+#if UINT_MAX > 0xffff
 #define VA_ARGS_SINT DINT
 #define VA_ARGS_INT DINT
-#define VA_ARGS_DINT DINT
-#define VA_ARGS_LINT LINT
 #define VA_ARGS_USINT UDINT
 #define VA_ARGS_UINT UDINT
-#define VA_ARGS_UDINT UDINT
-#define VA_ARGS_ULINT ULINT
-#define VA_ARGS_TIME TIME
 #define VA_ARGS_BOOL DWORD
 #define VA_ARGS_BYTE DWORD
 #define VA_ARGS_WORD DWORD
+#else
+#define VA_ARGS_SINT INT
+#define VA_ARGS_INT INT
+#define VA_ARGS_USINT UINT
+#define VA_ARGS_UINT UINT
+#define VA_ARGS_BOOL WORD
+#define VA_ARGS_BYTE WORD
+#define VA_ARGS_WORD WORD
+#endif
+
+#define VA_ARGS_REAL LREAL
+#define VA_ARGS_LREAL LREAL
+#define VA_ARGS_DINT DINT
+#define VA_ARGS_LINT LINT
+#define VA_ARGS_UDINT UDINT
+#define VA_ARGS_ULINT ULINT
+#define VA_ARGS_TIME TIME
 #define VA_ARGS_DWORD DWORD
 #define VA_ARGS_LWORD LWORD
 #define VA_ARGS_STRING STRING
