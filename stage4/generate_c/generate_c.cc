@@ -1100,7 +1100,6 @@ class generate_c_pous_c {
       }
       
       if (!print_declaration) {
-        s4o.print("#include \"POUS.h\"\n\n");
         /* (A.6) Function Block inline function declaration for function invocation */
         generate_c_inlinefcall_c *inlinedecl = new generate_c_inlinefcall_c(&s4o, symbol->fblock_name, symbol, FB_FUNCTION_PARAM"->");
         symbol->fblock_body->accept(*inlinedecl);
@@ -1846,7 +1845,7 @@ END_RESOURCE
       }
       
       /* (A.3) POUs inclusion */
-      s4o.print("/* #include \"POUS.c\" */\n\n");
+      s4o.print("#include \"POUS.c\"\n\n");
       
       wanted_declaretype = declare_dt;
       
